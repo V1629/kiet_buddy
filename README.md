@@ -1,4 +1,36 @@
-# Advanced RAG Chatbot
+# Advanced RAG Chatbot : KIET BUDDY
+
+## 📌 Introduction
+
+**Kiet Buddy** is an institutional chatbot developed to provide quick, reliable, and user-friendly support for institution-related queries.  
+Built entirely in **Python**, it offers a conversational interface that helps users (students, staff, and visitors) access information more efficiently without navigating complex systems manually.
+
+The project is aimed at improving communication and support workflows by acting as a virtual assistant for common institutional questions, reducing manual effort, and enhancing response speed.
+
+---
+
+## 🧰 Tech Stack
+
+![Python](https://img.shields.io/badge/Python-100%25-blue?style=for-the-badge&logo=python&logoColor=white)
+
+**Language Composition**
+- **Python** — 100%
+
+---
+
+## ✨ Highlights
+
+- 🤖 Institution-focused chatbot  
+- 💬 Conversational support interface  
+- ⚡ Faster access to institutional information  
+- 🐍 Fully Python-based codebase  
+- 📈 Scalable foundation for future AI/NLP enhancements
+
+---
+
+## 🎯 Vision
+
+Kiet Buddy aims to evolve into a smart digital campus assistant that makes institutional information more accessible, interactive, and responsive for all users.
 
 ## Project Structure
 
