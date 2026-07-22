@@ -15,7 +15,7 @@ import os, re, json, glob
 from typing import Optional
 
 import pandas as pd
-from openai import OpenAI
+import cohere
 from rank_bm25 import BM25Okapi
 
 from config.settings import (
@@ -247,28 +247,38 @@ def ingest_tables_to_duckdb(all_data):
 
 # ── Embeddings ─────────────────────────────────────────────────────────────
 
-def get_embeddings(client, texts):
-    r = client.embeddings.create(model=EMBED_MODEL, input=texts)
-    return [x.embedding for x in r.data]
+def get_embeddings(co_client, texts, input_type="search_document"):
+    """Get embeddings via Cohere embed API."""
+    r = co_client.embed(
+        model=EMBED_MODEL, texts=texts, input_type=input_type,
+        embedding_types=["float"],
+    )
+    return [list(e) for e in r.embeddings.float]
 
 
-def embed_in_batches(client, texts, progress_callback=None):
+def embed_in_batches(co_client, texts, input_type="search_document", progress_callback=None):
+    import time
     all_embs, total = [], len(texts)
-    for i in range(0, total, EMBED_BATCH_SIZE):
-        batch = texts[i:i+EMBED_BATCH_SIZE]
-        all_embs.extend(get_embeddings(client, batch))
+    # Cohere trial keys have 100K tokens/min limit — use small batches with delay
+    batch_size = min(EMBED_BATCH_SIZE, 20)
+    for i in range(0, total, batch_size):
+        batch = texts[i:i+batch_size]
+        all_embs.extend(get_embeddings(co_client, batch, input_type))
         if progress_callback:
             progress_callback(
-                f"Embedding {min(i+EMBED_BATCH_SIZE, total)}/{total} chunks...",
-                min(i+EMBED_BATCH_SIZE, total) / total
+                f"Embedding {min(i+batch_size, total)}/{total} chunks...",
+                min(i+batch_size, total) / total
             )
+        # Throttle to avoid Cohere trial rate limits (100K tokens/min)
+        if i + batch_size < total:
+            time.sleep(3)
     return all_embs
 
 
 # ── Master build ───────────────────────────────────────────────────────────
 
-def build_indexes(api_key, progress_callback=None):
-    client     = OpenAI(api_key=api_key)
+def build_indexes(cohere_api_key, progress_callback=None):
+    co_client  = cohere.Client(api_key=cohere_api_key)
     json_files = sorted(glob.glob(os.path.join(DATA_FOLDER, "*.json")))
     if not json_files:
         raise FileNotFoundError(f"No .json files in '{DATA_FOLDER}/'")
@@ -299,7 +309,7 @@ def build_indexes(api_key, progress_callback=None):
 
     # ChromaDB
     collection     = clear_chroma_collection()
-    all_embeddings = embed_in_batches(client, all_chunks, progress_callback)
+    all_embeddings = embed_in_batches(co_client, all_chunks, input_type="search_document", progress_callback=progress_callback)
 
     ids   = [f"chunk_{i}" for i in range(len(all_chunks))]
     BATCH = 500

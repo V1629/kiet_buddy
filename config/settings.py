@@ -21,10 +21,14 @@ MMR_LAMBDA        = 0.6             # 0=diversity, 1=relevance
 RERANK_MIN_SCORE  = 0.02            # below this → context too weak, fall back to GPT
 
 # ── Models ────────────────────────────────────────────
-EMBED_MODEL       = "text-embedding-3-small"
-LLM_MODEL         = "gpt-4o"
-ROUTER_MODEL      = "gpt-4o-mini"   # Cheaper + faster for routing/HyDE
+# Embeddings via Cohere (Groq does not support embeddings)
+EMBED_MODEL       = "embed-english-v3.0"
+# LLM via Groq (OpenAI-compatible API)
+LLM_MODEL         = "llama-3.3-70b-versatile"
+ROUTER_MODEL      = "llama-3.1-8b-instant"   # Cheaper + faster for routing/HyDE
 COHERE_RERANK     = "rerank-english-v3.0"
+# Groq API base URL (used with the openai SDK)
+GROQ_BASE_URL     = "https://api.groq.com/openai/v1"
 
 # ── HyDE ─────────────────────────────────────────────
 # Only use HyDE if query is vague (fewer than this many words = likely specific)

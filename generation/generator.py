@@ -4,6 +4,7 @@
 #   • System prompt references KIET University explicitly
 #   • SQL narration knows it's university/tabular data
 #   • Faithfulness check uses ROUTER_MODEL (fast, cheap)
+#   • LLM calls go to Groq via OpenAI-compatible SDK
 
 import pandas as pd
 from openai import OpenAI
@@ -202,7 +203,7 @@ RULES:
 - Be concise and direct. For yes/no questions, answer yes or no first."""
 
 def answer_general_fallback(client, query):
-    """GPT-4o-mini fallback when retrieved context is too weak to answer."""
+    """Groq Llama fallback when retrieved context is too weak to answer."""
     return client.chat.completions.create(
         model=ROUTER_MODEL,
         messages=[

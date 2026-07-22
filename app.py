@@ -24,10 +24,10 @@ from dotenv import load_dotenv
 load_dotenv()  # Loads keys from .env file automatically
 
 # API keys are loaded from .env / environment variables — not shown in UI
-openai_key = os.environ.get("OPENAI_API_KEY", "")
+groq_key   = os.environ.get("GROQ_API_KEY", "")
 cohere_key = os.environ.get("COHERE_API_KEY", "")
 
-from config.settings import DATA_FOLDER, PERSIST_DIR
+from config.settings import DATA_FOLDER, PERSIST_DIR, GROQ_BASE_URL
 from storage.store   import data_changed, indexes_exist
 from indexing.indexer import build_indexes, load_indexes_from_disk
 from pipeline.orchestrator import (
@@ -61,7 +61,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🧠 Advanced RAG Chatbot")
-st.caption("Hybrid Search · HyDE · Cohere Rerank · SQL Agent · Persistent Storage · Faithfulness Check")
+st.caption("Groq LLM · Cohere Embeddings · Hybrid Search · HyDE · Rerank · SQL Agent · Faithfulness Check")
 
 
 # ══════════════════════════════════════════════════════
@@ -113,7 +113,8 @@ with st.sidebar:
     st.markdown("""
 | Step | Method |
 |------|--------|
-| Route + HyDE | 1 GPT-4o-mini call |
+| Route + HyDE | 1 Groq Llama call |
+| Embed | Cohere embed-v3 |
 | Retrieval | Vector + BM25 + RRF |
 | Diversity | MMR |
 | Reranking | Cohere v3 |
@@ -126,8 +127,8 @@ with st.sidebar:
 # GUARDS
 # ══════════════════════════════════════════════════════
 
-if not openai_key:
-    st.error("❌ OPENAI_API_KEY is missing. Add it to your `.env` file and restart the app.")
+if not groq_key:
+    st.error("❌ GROQ_API_KEY is missing. Add it to your `.env` file and restart the app.")
     st.stop()
 if not cohere_key:
     st.error("❌ COHERE_API_KEY is missing. Add it to your `.env` file and restart the app.")
@@ -142,7 +143,7 @@ if not json_files:
 # ══════════════════════════════════════════════════════
 
 @st.cache_resource(show_spinner=False)
-def get_indexes(_openai_key: str, _trigger: str):
+def get_indexes(_cohere_key: str, _trigger: str):
     """
     Load from disk if index exists and data hasn't changed.
     Build from scratch only when necessary.
@@ -155,7 +156,7 @@ def get_indexes(_openai_key: str, _trigger: str):
         progress_bar = st.progress(0, text="Building index for the first time...")
         def _cb(msg, pct):
             progress_bar.progress(pct, text=msg)
-        idx = build_indexes(_openai_key, progress_callback=_cb)
+        idx = build_indexes(_cohere_key, progress_callback=_cb)
         progress_bar.empty()
         return idx
 
@@ -169,14 +170,14 @@ if force_reindex:
     st.cache_resource.clear()
 
 try:
-    idx = get_indexes(openai_key, st.session_state.reindex_trigger)
+    idx = get_indexes(cohere_key, st.session_state.reindex_trigger)
     idx["db_schemas"] = idx.get("db_schemas", {})
 except Exception as e:
     st.error(f"❌ Indexing error: {e}")
     st.stop()
 
-# Init OpenAI + Cohere clients
-client    = OpenAI(api_key=openai_key)
+# Init Groq (via OpenAI SDK) + Cohere clients
+client    = OpenAI(api_key=groq_key, base_url=GROQ_BASE_URL)
 co_client = cohere.Client(api_key=cohere_key)
 
 

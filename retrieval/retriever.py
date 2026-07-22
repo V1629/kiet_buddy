@@ -11,7 +11,6 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
 import cohere
-from openai import OpenAI
 
 from config.settings import (
     EMBED_MODEL, INITIAL_TOP_K, FINAL_TOP_K,
@@ -21,9 +20,13 @@ from config.settings import (
 
 # ── Embedding ─────────────────────────────────────────────────────────────
 
-def get_embedding(client, text):
-    r = client.embeddings.create(model=EMBED_MODEL, input=[text])
-    return r.data[0].embedding
+def get_embedding(co_client, text, input_type="search_query"):
+    """Get a single embedding via Cohere embed API."""
+    r = co_client.embed(
+        model=EMBED_MODEL, texts=[text], input_type=input_type,
+        embedding_types=["float"],
+    )
+    return list(r.embeddings.float[0])
 
 
 # ── HyDE ──────────────────────────────────────────────────────────────────
@@ -35,8 +38,9 @@ Include realistic details like names, numbers, and specifics."""
 def should_use_hyde(query):
     return len(query.strip().split()) >= HYDE_MIN_WORDS
 
-def generate_hyde(client, query):
-    r = client.chat.completions.create(
+def generate_hyde(llm_client, query):
+    """Generate HyDE passage via Groq LLM."""
+    r = llm_client.chat.completions.create(
         model=ROUTER_MODEL,
         messages=[
             {"role": "system", "content": HYDE_PROMPT},
@@ -46,18 +50,19 @@ def generate_hyde(client, query):
     )
     return r.choices[0].message.content.strip()
 
-def get_query_embedding(client, query):
+def get_query_embedding(llm_client, co_client, query):
+    """Get query embedding, optionally enhanced with HyDE."""
     if should_use_hyde(query):
-        hyde_text = generate_hyde(client, query)
+        hyde_text = generate_hyde(llm_client, query)
         # Parallelize the two embedding calls
         with ThreadPoolExecutor(max_workers=2) as pool:
-            q_future    = pool.submit(get_embedding, client, query)
-            hyde_future = pool.submit(get_embedding, client, hyde_text)
+            q_future    = pool.submit(get_embedding, co_client, query, "search_query")
+            hyde_future = pool.submit(get_embedding, co_client, hyde_text, "search_query")
             q_emb    = q_future.result()
             hyde_emb = hyde_future.result()
         combined = [(a+b)/2 for a, b in zip(q_emb, hyde_emb)]
         return combined, True
-    return get_embedding(client, query), False
+    return get_embedding(co_client, query, "search_query"), False
 
 
 # ── BM25 ──────────────────────────────────────────────────────────────────
@@ -145,6 +150,9 @@ def retrieve(idx, client, co_client, query, hyde_override=None):
     """
     Full pipeline:
       embed (+ HyDE if needed) → vector + BM25 → RRF → MMR → Cohere rerank
+
+    client: Groq LLM client (for HyDE generation)
+    co_client: Cohere client (for embeddings + reranking)
     Returns (final_chunks, hyde_used)
     """
     collection     = idx["collection"]
@@ -157,14 +165,14 @@ def retrieve(idx, client, co_client, query, hyde_override=None):
     if hyde_override:
         # Parallelize the two embedding calls
         with ThreadPoolExecutor(max_workers=2) as pool:
-            q_future    = pool.submit(get_embedding, client, query)
-            hyde_future = pool.submit(get_embedding, client, hyde_override)
+            q_future    = pool.submit(get_embedding, co_client, query, "search_query")
+            hyde_future = pool.submit(get_embedding, co_client, hyde_override, "search_query")
             q_emb    = q_future.result()
             hyde_emb = hyde_future.result()
         query_emb = [(a+b)/2 for a, b in zip(q_emb, hyde_emb)]
         hyde_used = True
     else:
-        query_emb, hyde_used = get_query_embedding(client, query)
+        query_emb, hyde_used = get_query_embedding(client, co_client, query)
 
     # Optional chunk_type filter for KIET-specific query patterns
     where_filter = detect_chunk_type_filter(query)

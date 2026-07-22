@@ -4,6 +4,9 @@
 # This is the single entry point for every user query.
 # It wires together: cache → router → retrieval → generation
 #
+# LLM: Groq (via OpenAI-compatible SDK)
+# Embeddings: Cohere embed-english-v3.0
+#
 # Optimizations applied:
 #   ✅ Merged router + HyDE into ONE LLM call
 #   ✅ HyDE skipped for short/specific queries
@@ -153,7 +156,7 @@ def route_and_hyde(client: OpenAI, query: str) -> tuple[str, Optional[str], str]
 class PipelineResult:
     """Everything the UI needs to render a response."""
     def __init__(self):
-        self.stream        = None    # OpenAI streaming response (or cached string)
+        self.stream        = None    # Groq streaming response (or cached string)
         self.route         = ""      # TEXT / ANALYTICAL / GENERAL
         self.chunks        = []      # Retrieved chunks (for sources)
         self.result_df     = None    # DataFrame for ANALYTICAL queries
@@ -182,15 +185,15 @@ def run_pipeline(idx: dict,
             ↓
         ┌── TEXT ──────────────────────────────────────────┐
         │  Retrieve: Vector + BM25 → RRF → MMR → Rerank   │
-        │  Generate: GPT-4o grounded answer (streamed)     │
+        │  Generate: Groq Llama grounded answer (streamed)  │
         │  [Async after stream]: Faithfulness check        │
         └──────────────────────────────────────────────────┘
-        ┌── ANALYTICAL ────────────────────────────────────┐
+        ┌── ANALYTICAL ──────────────────────────────────────┐
         │  SQL Agent: generate → execute → self-correct    │
-        │  Narrate: GPT-4o explains result (streamed)      │
+        │  Narrate: Groq explains result (streamed)       │
         └──────────────────────────────────────────────────┘
-        ┌── GENERAL ───────────────────────────────────────┐
-        │  GPT-4o direct answer (streamed)                 │
+        ┌── GENERAL ─────────────────────────────────────────┐
+        │  Groq direct answer (streamed)                   │
         └──────────────────────────────────────────────────┘
             ↓
         Cache result
@@ -295,7 +298,7 @@ def run_pipeline(idx: dict,
         result.chunks = []
         result.stream = answer_general_fallback(client, query)
         result.steps.append(
-            "🌐 Web search unavailable — answering with GPT-4o general knowledge"
+            "🌐 Web search unavailable — answering with Groq general knowledge"
         )
         return result
 
@@ -324,7 +327,7 @@ def run_pipeline(idx: dict,
         result.chunks = []
         result.stream = answer_general_fallback(client, query)
         result.steps.append(
-            "🌐 Web search unavailable — answering with GPT-4o general knowledge"
+            "🌐 Web search unavailable — answering with Groq general knowledge"
         )
         return result
 
