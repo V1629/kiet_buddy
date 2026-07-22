@@ -4,12 +4,14 @@
 .env
 
 
-# ── Persistent indexes (rebuilt automatically on first run) ──
-# These are large binary/database files generated at runtime
-storage/bm25.pkl
-storage/duck.db
-storage/chroma/
-storage/data_hash.txt
+
+# ── Persistent indexes ──
+# These are committed so Streamlit Cloud loads them
+# without re-indexing on every deploy.
+# storage/bm25.pkl
+# storage/duck.db
+# storage/chroma/
+# storage/data_hash.txt
 
 
 # ── Python cache & compiled bytecode ─────────────────
